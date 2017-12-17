@@ -10,6 +10,11 @@ set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_MODULE_PATH})
 find_package(Libnl REQUIRED)
 include_directories(BEFORE ${LIBNL_INCLUDE_DIRS})
 set(API_SOURCES kernel_api.cpp)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 add_library(congdb-api SHARED ${API_SOURCES})
 
-install(TARGETS congdb-api LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS congdb-api 
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+file(GLOB HEADERS include/*.hpp)
+install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
