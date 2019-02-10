@@ -20,6 +20,10 @@ enum congdb_nl_cmds {
 
     CONGDB_C_ADD_ENTRY,
     CONGDB_C_DEL_ENTRY,
+
+    CONGDB_C_GET_ENTRY,
+    CONGDB_C_SET_ENTRY,
+
     CONGDB_C_CLEAR_ENTRIES,
 
     CONGDB_C_LIST_ENTRIES,
@@ -60,12 +64,18 @@ public:
     
     void add_entry(const rule_id& id, const std::string &ca_name);
     void del_entry(const rule_id& id);
+
+    congdb_entry get_entry(const rule_id& id);
+    void set_entry(const rule_id& id, const std::string &ca_name);
+
     void clear_entries();
 
 private: /* methods */
     void request_entries();
-
     congdb_data receive_entries();
+
+    void request_entry(const rule_id& id);
+    congdb_entry receive_entry();
 
 private: /* members */
     nl_sock* m_sock;

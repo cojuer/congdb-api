@@ -50,6 +50,31 @@ void CONGDBKernelAPI::add_entry(const rule_id& id,
     nl_wait_for_ack(m_sock);
 }
 
+void CONGDBKernelAPI::set_entry(const rule_id& id, 
+                                const std::string& ca_name) 
+{
+    std::cout << "set entry " << std::string(id) << std::endl;
+    std::shared_ptr<nl_msg> msg = {nlmsg_alloc(), nlmsg_free};
+    const int flags = NLM_F_REQUEST | NLM_F_ACK;
+    if (!genlmsg_put(msg.get(), NL_AUTO_PID, NL_AUTO_SEQ, m_fam_id, 0, flags, CONGDB_C_SET_ENTRY, VERSION))
+        throw std::runtime_error("Failed to put message");
+    if (nla_put_u32(msg.get(), CONGDB_A_LOC_IP, id.loc_ip) < 0)
+        throw std::runtime_error("Failed to put local ip");
+    if (nla_put_u32(msg.get(), CONGDB_A_LOC_MASK, id.loc_mask) < 0)
+        throw std::runtime_error("Failed to put local mask");
+    if (nla_put_u32(msg.get(), CONGDB_A_REM_IP, id.rem_ip) < 0)
+        throw std::runtime_error("Failed to put remote ip");
+    if (nla_put_u32(msg.get(), CONGDB_A_REM_MASK, id.rem_mask) < 0)
+        throw std::runtime_error("Failed to put remote mask");
+    if (nla_put_u8(msg.get(), CONGDB_A_PRIORITY, id.priority) < 0)
+        throw std::runtime_error("Failed to put priority");
+    if (nla_put_string(msg.get(), CONGDB_A_CA, ca_name.c_str()) < 0)
+        throw std::runtime_error("Failed to put congestion algorithm name");
+    if (nl_send_auto(m_sock, msg.get()) < 0)
+        throw std::runtime_error("Failed to send request");
+    nl_wait_for_ack(m_sock);
+}
+
 void CONGDBKernelAPI::del_entry(const rule_id& id) 
 {
     std::shared_ptr<nl_msg> msg = {nlmsg_alloc(), nlmsg_free};
@@ -183,10 +208,133 @@ congdb_data CONGDBKernelAPI::receive_entries()
     return entries;
 }
 
+/**
+ * Request entry woth given identifier
+ */
+void CONGDBKernelAPI::request_entry(const rule_id& id) 
+{
+    std::shared_ptr<nl_msg> msg = {nlmsg_alloc(), nlmsg_free};
+    const int flags = NLM_F_REQUEST;
+    // put type
+    if (!genlmsg_put(msg.get(), NL_AUTO_PID, NL_AUTO_SEQ, m_fam_id, 0, flags, CONGDB_C_GET_ENTRY, VERSION))
+        throw std::runtime_error("Failed to put message");
+    // put ips and masks
+    if (nla_put_u32(msg.get(), CONGDB_A_LOC_IP, id.loc_ip) < 0)
+        throw std::runtime_error("Failed to put local ip");
+    if (nla_put_u32(msg.get(), CONGDB_A_LOC_MASK, id.loc_mask) < 0)
+        throw std::runtime_error("Failed to put local mask");
+    if (nla_put_u32(msg.get(), CONGDB_A_REM_IP, id.rem_ip) < 0)
+        throw std::runtime_error("Failed to put remote ip");
+    if (nla_put_u32(msg.get(), CONGDB_A_REM_MASK, id.rem_mask) < 0)
+        throw std::runtime_error("Failed to put remote mask");
+    if (nla_put_u8(msg.get(), CONGDB_A_PRIORITY, id.priority) < 0)
+        throw std::runtime_error("Failed to put priority");
+    // send
+    if (nl_send_auto(m_sock, msg.get()) < 0)
+        throw std::runtime_error("Failed to send request");
+}
+
+/**
+ * Receive requested entry
+ */
+congdb_entry CONGDBKernelAPI::receive_entry() 
+{
+    auto parser = [](nl_msg* msg, void *object) -> int {
+        auto& entry = *static_cast<congdb_entry*>(object);
+        genlmsghdr *hdr = genlmsg_hdr(nlmsg_hdr(msg));
+        
+        if (hdr->cmd != CONGDB_C_GET_ENTRY) return -1;
+        nlattr *attrs = genlmsg_attrdata(hdr, 0);
+        nlattr *attr = attrs;
+        int len = genlmsg_attrlen(hdr, 0);
+        int rem = len;
+
+        if (nla_type(attr) != CONGDB_A_LOC_IP) return -1;
+        uint32_t loc_ip{ nla_get_u32(attr) };
+        
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+        
+        if (nla_type(attr) != CONGDB_A_LOC_MASK) return -1;
+        uint32_t loc_mask{ nla_get_u32(attr) };
+        
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+        
+        if (nla_type(attr) != CONGDB_A_REM_IP) return -1;
+        uint32_t rem_ip{ nla_get_u32(attr) };
+
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_REM_MASK) return -1;
+        uint32_t rem_mask{ nla_get_u32(attr) };
+
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_PRIORITY) return -1;
+        uint32_t priority{ nla_get_u8(attr) };
+
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_CA) return -1;
+        std::string ca_name{ nla_get_string(attr) };
+
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_ACKS_NUM) return -1;
+        uint32_t acks_num{ nla_get_u32(attr) };
+
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_LOSS_NUM) return -1;
+        uint32_t loss_num{ nla_get_u32(attr) };
+
+        attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_RTT) return -1;
+        uint32_t rtt{ nla_get_u32(attr) };
+        attr = nla_next(attr, &rem);
+
+        entry.id.loc_ip = loc_ip;
+        entry.id.loc_mask = loc_mask;
+        entry.id.rem_ip = rem_ip;
+        entry.id.rem_mask = rem_mask;
+        entry.id.priority = priority;
+        entry.ca_name = (char*)malloc(ca_name.size() * sizeof(char));
+        strcpy(entry.ca_name, ca_name.c_str());
+        entry.stats.acks_num = acks_num;
+        entry.stats.loss_num = loss_num;
+        entry.stats.rtt = rtt;
+
+        return NL_OK;
+    };
+
+    congdb_entry entry;
+    if (nl_socket_modify_cb(m_sock, NL_CB_MSG_IN, NL_CB_CUSTOM, parser, &entry) < 0)
+        throw std::runtime_error("Failed to change the default nl message parser");
+    if (nl_recvmsgs_default(m_sock) < 0)
+        throw std::runtime_error("Failed to receive message");
+    nl_wait_for_ack(m_sock);
+    return entry;
+}
+
+
 congdb_data CONGDBKernelAPI::list_entries()
 {
     request_entries();
     return receive_entries();
+}
+
+congdb_entry CONGDBKernelAPI::get_entry(const rule_id& id)
+{
+    request_entry(id);
+    return receive_entry();
 }
 
 CONGDBKernelAPI::~CONGDBKernelAPI() 
