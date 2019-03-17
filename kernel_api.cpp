@@ -177,6 +177,11 @@ congdb_data CONGDBKernelAPI::receive_entries()
             uint32_t rtt{ nla_get_u32(attr) };
             attr = nla_next(attr, &rem);
 
+            if (!nla_ok(attr, rem)) return -1;
+            if (nla_type(attr) != CONGDB_A_BBR_RATE) return -1;
+            uint64_t bbr_rate{ nla_get_u64(attr) };
+            attr = nla_next(attr, &rem);
+
             congdb_entry entry;
             entry.id.loc_ip = loc_ip;
             entry.id.loc_mask = loc_mask;
@@ -188,6 +193,7 @@ congdb_data CONGDBKernelAPI::receive_entries()
             entry.stats.acks_num = acks_num;
             entry.stats.loss_num = loss_num;
             entry.stats.rtt = rtt;
+            entry.stats.bbr_rate = bbr_rate;
             entries.push_back(entry);
         }
 
@@ -299,7 +305,12 @@ congdb_entry CONGDBKernelAPI::receive_entry()
 
         if (nla_type(attr) != CONGDB_A_RTT) return -1;
         uint32_t rtt{ nla_get_u32(attr) };
+
         attr = nla_next(attr, &rem);
+        if (!nla_ok(attr, rem)) return -1;
+
+        if (nla_type(attr) != CONGDB_A_BBR_RATE) return -1;
+        uint64_t bbr_rate{ nla_get_u64(attr) };
 
         entry.id.loc_ip = loc_ip;
         entry.id.loc_mask = loc_mask;
@@ -311,6 +322,7 @@ congdb_entry CONGDBKernelAPI::receive_entry()
         entry.stats.acks_num = acks_num;
         entry.stats.loss_num = loss_num;
         entry.stats.rtt = rtt;
+        entry.stats.bbr_rate = bbr_rate;
 
         return NL_OK;
     };
