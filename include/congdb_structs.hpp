@@ -19,16 +19,16 @@ static std::string uint_ip_to_str(uint32_t int_ip)
     return "Error: could not convert ip from uin32_t";
 }
 
-static int popcount(uint32_t v) {
-    v = v - ((v >> 1) & 0x55555555);                // put count of each 2 bits into those 2 bits
-    v = (v & 0x33333333) + ((v >> 2) & 0x33333333); // put count of each 4 bits into those 4 bits  
-    return (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
-}
-
 std::string uint64_to_string(uint64_t value) {
     std::ostringstream os;
     os << value;
     return os.str();
+}
+
+static int popcount(uint32_t v) {
+    v = v - ((v >> 1) & 0x55555555);                // put count of each 2 bits into those 2 bits
+    v = (v & 0x33333333) + ((v >> 2) & 0x33333333); // put count of each 4 bits into those 4 bits  
+    return (((v + (v >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24;
 }
 
 struct rule_id {
@@ -55,12 +55,14 @@ struct rule_stats {
     uint32_t loss_num;
     uint32_t rtt;
     uint64_t bbr_rate;
+    uint32_t time_us;
 
     operator std::string() const {
         return std::string("acks_num:") + std::to_string(acks_num) + std::string("\n") + 
                std::string("loss_num:") + std::to_string(loss_num) + std::string("\n") + 
                std::string("rtt:") + std::to_string(rtt) + std::string("\n") +
-               std::string("bbr_rate:") + uint64_to_string(bbr_rate);
+               std::string("bbr_rate:") + uint64_to_string(bbr_rate) + std::string("\n") +
+               std::string("time_us:") + std::to_string(time_us);
     }
 };
 

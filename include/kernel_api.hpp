@@ -50,6 +50,7 @@ enum congdb_nl_attrs {
     CONGDB_A_LOSS_NUM,
     CONGDB_A_RTT,
     CONGDB_A_BBR_RATE,
+    CONGDB_A_TIME_US,
 
     // used to verify nl attributes
     __CONGDB_A_MAX,
