@@ -1,4 +1,6 @@
-## Fdmpd project
+## Shared library with CONGDB userspace API 
+
+Allows sending requests to kernel module through netlink sockets.
 
 ### Prerequisites
 libnl-genl-3-dev
@@ -9,11 +11,3 @@ cd build
 cmake ../  
 make  
 make install  
-
-### Usage
-Project installs two binary files:  
-fdmpd - daemon, that connects to the kernel part of fdmp and 
-controls it using range of heuristics.  
-fdmp-ctl - command line tool to explicitly show/change fdmp 
-kernel part configuration.  
-  
